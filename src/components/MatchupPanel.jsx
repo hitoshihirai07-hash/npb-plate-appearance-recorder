@@ -5,7 +5,7 @@ function Stat({ label, value }) {
   return <div className="stat"><span>{label}</span><strong>{value}</strong></div>;
 }
 
-export default function MatchupPanel({ game, matchup, form, setForm, onNext }) {
+export default function MatchupPanel({ game, matchup, form, setForm, onNext, onQuickRecord, quickRecordAvailable }) {
   const pitcherStats = getPitcherStats(matchup.pitcher.id);
   const batterStats = getBatterStats(matchup.batter.id);
   const headToHead = getMatchupStats(matchup.pitcher.id, matchup.batter.id);
@@ -80,18 +80,30 @@ export default function MatchupPanel({ game, matchup, form, setForm, onNext }) {
               return {
                 ...current,
                 result,
-                pitchType: result === '申告敬遠' ? '投球なし' : (current.pitchType === '投球なし' ? 'ストレート' : current.pitchType),
+                pitchType: result === '申告敬遠' ? '投球なし' : (current.pitchType === '投球なし' ? '不明' : current.pitchType),
                 speed: result === '申告敬遠' ? '' : current.speed,
               };
             })}>
+              <option value="" disabled>選択してください</option>
               {RESULTS.map((result) => <option key={result}>{result}</option>)}
             </select>
           </label>
         </div>
-        <button type="submit" className="button button--primary button--record" disabled={game.finished}>
-          {game.finished ? '試合終了' : '走者の進塁を設定'}
-          {!game.finished && <span aria-hidden="true">›</span>}
-        </button>
+        <div className={`record-actions${quickRecordAvailable ? ' record-actions--quick' : ''}`}>
+          {quickRecordAvailable ? (
+            <button type="button" className="button button--primary button--record" disabled={game.finished} onClick={onQuickRecord}>
+              走者なしで即記録
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            className={`button ${quickRecordAvailable ? 'button--outline' : 'button--primary'} button--record`}
+            disabled={game.finished}
+          >
+            {game.finished ? '試合終了' : quickRecordAvailable ? '走者を確認して記録' : '走者の進塁を設定'}
+            {!game.finished && !quickRecordAvailable ? <span aria-hidden="true">›</span> : null}
+          </button>
+        </div>
       </form>
     </section>
   );

@@ -59,6 +59,16 @@ button:disabled {
   opacity: 0.45;
 }
 
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+
 .button {
   min-height: 40px;
   padding: 0 16px;
@@ -163,6 +173,111 @@ button:disabled {
   background: transparent;
   border-color: #8eb6e7;
   color: white;
+}
+
+.saved-games-panel {
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.saved-games-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.saved-games-heading h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.saved-games-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.saved-games-tools,
+.saved-game-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.saved-games-list {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.saved-game-card {
+  display: grid;
+  grid-template-columns: 150px minmax(240px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.saved-game-card:last-child {
+  border-bottom: 0;
+}
+
+.saved-game-card__date,
+.saved-game-card__matchup {
+  display: grid;
+  gap: 4px;
+}
+
+.saved-game-card__date strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.saved-game-card__date span,
+.saved-game-card__matchup small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.saved-game-card__matchup > strong {
+  font-size: 17px;
+}
+
+.saved-game-card__matchup > strong span {
+  margin-inline: 7px;
+  color: var(--muted);
+}
+
+.saved-game-card__actions .button {
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 12px;
+}
+
+.saved-games-empty {
+  margin: 0;
+  padding: 20px 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.saved-games-message {
+  margin: 12px 18px 0;
+}
+
+.saved-games-success {
+  margin: 12px 18px 0;
+  padding: 9px 12px;
+  border-left: 4px solid var(--green);
+  background: #effaf2;
+  color: #0d6c2c;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .setup-basics,
@@ -769,6 +884,19 @@ button:disabled {
   font-size: 18px;
 }
 
+.record-actions {
+  display: grid;
+}
+
+.record-actions--quick {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.record-actions .button--record {
+  margin-top: 14px;
+}
+
 .button--record span {
   font-size: 30px;
   font-weight: 400;
@@ -777,6 +905,10 @@ button:disabled {
 
 .form-error--workspace {
   margin: 8px 0 0;
+}
+
+.storage-error {
+  margin: 0 0 10px;
 }
 
 .game-state-panel {
@@ -1632,6 +1764,17 @@ button:disabled {
     font-size: 16px;
   }
 
+  .record-actions--quick {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .record-actions--quick .button--outline {
+    min-height: 46px;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+
   .game-state-panel {
     display: flex;
     padding: 12px;
@@ -1935,6 +2078,48 @@ button:disabled {
     min-width: 120px;
     padding-inline: 9px;
     font-size: 11px;
+  }
+
+  .saved-games-panel {
+    margin: 10px;
+    box-shadow: none;
+  }
+
+  .saved-games-heading {
+    display: grid;
+    padding: 14px;
+  }
+
+  .saved-games-tools {
+    justify-content: stretch;
+  }
+
+  .saved-games-tools .button {
+    flex: 1;
+    min-height: 42px;
+    padding-inline: 9px;
+    font-size: 11px;
+  }
+
+  .saved-game-card {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding: 14px;
+  }
+
+  .saved-game-card__date {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .saved-game-card__actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  }
+
+  .saved-game-card__actions .button {
+    padding-inline: 6px;
   }
 
   .setup-basics,

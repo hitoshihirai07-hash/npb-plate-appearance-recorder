@@ -8,6 +8,7 @@ import {
   shortTeamName,
 } from '../game';
 import PlayerSearchInput from './PlayerSearchInput';
+import SavedGamesPanel from './SavedGamesPanel';
 
 function defaultPitcher(team) {
   return dataStore.playersFor(team, '投手').find((player) => player.registration === '支配下')
@@ -25,7 +26,25 @@ function defaultLineup(team) {
   }));
 }
 
-function LineupEditor({ team, lineup, onChange }) {
+function savedLineup(team, lineupPresets) {
+  const preset = lineupPresets[team];
+  if (!preset?.lineup || preset.lineup.length !== 9) return null;
+  return preset.lineup.map((player) => ({
+    ...(dataStore.playerByTeamAndId(team, player.id) ?? player),
+    lineupPosition: player.lineupPosition,
+  }));
+}
+
+function initialLineup(team, lineupPresets) {
+  return savedLineup(team, lineupPresets) ?? defaultLineup(team);
+}
+
+function initialPitcher(team, lineupPresets) {
+  const pitcher = lineupPresets[team]?.pitcher;
+  return (pitcher && dataStore.playerByTeamAndId(team, pitcher.id)) ?? pitcher ?? defaultPitcher(team);
+}
+
+function LineupEditor({ team, lineup, onChange, fromPreviousGame }) {
   const options = useMemo(() => dataStore.playersFor(team), [team]);
 
   const changePlayer = (index, selected) => {
@@ -46,7 +65,7 @@ function LineupEditor({ team, lineup, onChange }) {
     <section className="setup-lineup" aria-labelledby={`lineup-${team}`}>
       <div className="setup-lineup__heading">
         <h3 id={`lineup-${team}`}>{shortTeamName(team)} 打順</h3>
-        <span>位置を選び、選手名で検索</span>
+        <span>{fromPreviousGame ? '前回のスタメンを反映' : '位置を選び、選手名で検索'}</span>
       </div>
       <div className="setup-lineup__columns" aria-hidden="true">
         <span>打順</span><span>位置</span><span>選手</span>
@@ -76,7 +95,17 @@ function LineupEditor({ team, lineup, onChange }) {
   );
 }
 
-export default function SetupScreen({ savedGame, onStart, onResume, onViewResult }) {
+export default function SetupScreen({
+  savedGames,
+  lineupPresets,
+  storageError,
+  onStart,
+  onResume,
+  onViewResult,
+  onDelete,
+  onBackup,
+  onRestore,
+}) {
   const opponents = dataStore.teams.filter((team) => team !== GIANTS);
   const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [giantsSide, setGiantsSide] = useState('home');
@@ -84,19 +113,19 @@ export default function SetupScreen({ savedGame, onStart, onResume, onViewResult
   const awayTeam = giantsSide === 'away' ? GIANTS : opponent;
   const homeTeam = giantsSide === 'home' ? GIANTS : opponent;
   const [lineups, setLineups] = useState(() => ({
-    [GIANTS]: defaultLineup(GIANTS),
-    [opponent]: defaultLineup(opponent),
+    [GIANTS]: initialLineup(GIANTS, lineupPresets),
+    [opponent]: initialLineup(opponent, lineupPresets),
   }));
   const [pitchers, setPitchers] = useState(() => ({
-    [GIANTS]: defaultPitcher(GIANTS),
-    [opponent]: defaultPitcher(opponent),
+    [GIANTS]: initialPitcher(GIANTS, lineupPresets),
+    [opponent]: initialPitcher(opponent, lineupPresets),
   }));
   const [error, setError] = useState('');
 
   const changeOpponent = (team) => {
     setOpponent(team);
-    setLineups((current) => ({ ...current, [team]: current[team] ?? defaultLineup(team) }));
-    setPitchers((current) => ({ ...current, [team]: current[team] ?? defaultPitcher(team) }));
+    setLineups((current) => ({ ...current, [team]: current[team] ?? initialLineup(team, lineupPresets) }));
+    setPitchers((current) => ({ ...current, [team]: current[team] ?? initialPitcher(team, lineupPresets) }));
   };
 
   const changeStartingPitcher = (team, pitcher) => {
@@ -159,15 +188,17 @@ export default function SetupScreen({ savedGame, onStart, onResume, onViewResult
           <h1>NPB 打席記録</h1>
           <p>守備位置と選手を検索して、両チームの打順を設定します。</p>
         </div>
-        {savedGame && (
-          <div className="setup-saved-actions">
-            <button type="button" className="button button--outline" onClick={onViewResult}>保存結果を見る</button>
-            {!savedGame.finished ? (
-              <button type="button" className="button button--primary" onClick={onResume}>保存中の試合を再開</button>
-            ) : null}
-          </div>
-        )}
       </header>
+
+      <SavedGamesPanel
+        games={savedGames}
+        storageError={storageError}
+        onResume={onResume}
+        onViewResult={onViewResult}
+        onDelete={onDelete}
+        onBackup={onBackup}
+        onRestore={onRestore}
+      />
 
       <section className="setup-basics" aria-labelledby="game-settings-title">
         <div className="section-heading">
@@ -218,7 +249,8 @@ export default function SetupScreen({ savedGame, onStart, onResume, onViewResult
           <LineupEditor
             key={team}
             team={team}
-            lineup={lineups[team] ?? defaultLineup(team)}
+            lineup={lineups[team] ?? initialLineup(team, lineupPresets)}
+            fromPreviousGame={Boolean(lineupPresets[team])}
             onChange={(lineup) => setLineups((current) => ({ ...current, [team]: lineup }))}
           />
         ))}

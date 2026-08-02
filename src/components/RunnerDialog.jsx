@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { defaultRunnerOutcomes } from '../game';
+import { defaultRunnerOutcomes, suggestedRbi } from '../game';
 
 const DESTINATIONS = [
   ['out', 'アウト'],
@@ -10,11 +10,6 @@ const DESTINATIONS = [
 ];
 
 const SOURCE_LABEL = { batter: '打者', first: '一塁走者', second: '二塁走者', third: '三塁走者' };
-
-function suggestedRbi(result, outcomes) {
-  if (result === '失策' || result === '併殺打') return 0;
-  return outcomes.filter((item) => item.destination === 'score').length;
-}
 
 export default function RunnerDialog({ game, batter, result, onCancel, onConfirm }) {
   const initial = useMemo(() => defaultRunnerOutcomes(game, batter, result), [game, batter, result]);

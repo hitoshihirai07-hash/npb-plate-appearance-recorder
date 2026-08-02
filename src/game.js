@@ -72,6 +72,31 @@ export const OUT_RESULTS = new Set([
   '併殺打',
 ]);
 
+const QUICK_RECORD_RESULTS = new Set([
+  '空振り三振',
+  '見逃し三振',
+  '投ゴロ',
+  '一ゴロ',
+  '二ゴロ',
+  '三ゴロ',
+  '遊ゴロ',
+  '左飛',
+  '中飛',
+  '右飛',
+  'ライナー',
+  '内野フライ',
+  'ファウルフライ',
+  '単打',
+  '二塁打',
+  '三塁打',
+  '本塁打',
+  '四球',
+  '申告敬遠',
+  '敬遠（申告なし）',
+  '死球',
+  '失策',
+]);
+
 export function shortTeamName(team) {
   const names = {
     読売ジャイアンツ: '巨人',
@@ -174,6 +199,19 @@ export function defaultRunnerOutcomes(game, batter, result) {
   }
 
   return entries;
+}
+
+export function canQuickRecord(game, result) {
+  return Boolean(result)
+    && QUICK_RECORD_RESULTS.has(result)
+    && !game.bases.first
+    && !game.bases.second
+    && !game.bases.third;
+}
+
+export function suggestedRbi(result, outcomes) {
+  if (result === '失策' || result === '併殺打') return 0;
+  return outcomes.filter((item) => item.destination === 'score').length;
 }
 
 function clone(value) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import SetupScreen from './components/SetupScreen';
 import Scoreboard from './components/Scoreboard';
 import LineupRail from './components/LineupRail';
@@ -12,53 +12,29 @@ import DefenseChangeDialog from './components/DefenseChangeDialog';
 import GameStatsPanel from './components/GameStatsPanel';
 import SavedGameView from './components/SavedGameView';
 import {
-  DEFAULT_LINEUP_POSITIONS,
-  STORAGE_KEY,
   applyPlateAppearance,
   applyRunnerAction,
+  canQuickRecord,
   currentMatchup,
+  defaultRunnerOutcomes,
   exportGameCsv,
   shortTeamName,
+  suggestedRbi,
   substituteBatter,
   substituteFielder,
   substitutePitcher,
   substituteRunner,
   undoLast,
 } from './game';
-
-function readSavedGame() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
-    const game = JSON.parse(stored);
-    const previousVersion = game.version ?? 1;
-    for (const side of ['away', 'home']) {
-      const key = `${side}Lineup`;
-      game.config[key] = game.config[key].map((player, index) => ({
-        ...player,
-        lineupPosition: player.lineupPosition ?? DEFAULT_LINEUP_POSITIONS[index],
-      }));
-    }
-    let plateAppearanceNumber = 0;
-    game.events = (game.events ?? []).map((event, index) => {
-      const type = event.type ?? 'plateAppearance';
-      if (type === 'plateAppearance') plateAppearanceNumber += 1;
-      return {
-        ...event,
-        number: index + 1,
-        type,
-        plateAppearanceNumber: type === 'plateAppearance' ? (event.plateAppearanceNumber ?? plateAppearanceNumber) : undefined,
-        rbi: type === 'plateAppearance' ? Number(event.rbi ?? 0) : undefined,
-        scored: event.scored ?? [],
-      };
-    });
-    game.version = 2;
-    if (previousVersion < 2) game.undoStack = [];
-    return game;
-  } catch {
-    return null;
-  }
-}
+import {
+  exportArchiveJson,
+  loadArchive,
+  mergeArchive,
+  persistArchive,
+  rememberStartingLineups,
+  removeGame,
+  upsertGame,
+} from './storage';
 
 function downloadCsv(game) {
   const blob = new Blob([exportGameCsv(game)], { type: 'text/csv;charset=utf-8' });
@@ -66,6 +42,18 @@ function downloadCsv(game) {
   const link = document.createElement('a');
   link.href = url;
   link.download = `${game.config.date}_${shortTeamName(game.config.awayTeam)}-${shortTeamName(game.config.homeTeam)}_打席記録.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadBackup(archive) {
+  const blob = new Blob([exportArchiveJson(archive)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `npb打席記録_全試合バックアップ_${new Date().toLocaleDateString('sv-SE')}.json`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -119,9 +107,12 @@ function MobileGameBar({ game }) {
 }
 
 export default function App() {
-  const [savedGame, setSavedGame] = useState(readSavedGame);
+  const [initialStorage] = useState(loadArchive);
+  const [archive, setArchive] = useState(initialStorage.archive);
+  const archiveRef = useRef(initialStorage.archive);
+  const [storageError, setStorageError] = useState(initialStorage.error);
   const [game, setGame] = useState(null);
-  const [form, setForm] = useState({ pitchType: 'ストレート', speed: '', result: '空振り三振' });
+  const [form, setForm] = useState({ pitchType: '不明', speed: '', result: '' });
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
   const [runnerActionOpen, setRunnerActionOpen] = useState(false);
   const [runnerSubstitutionOpen, setRunnerSubstitutionOpen] = useState(false);
@@ -131,11 +122,19 @@ export default function App() {
   const [toast, setToast] = useState('');
 
   const matchup = useMemo(() => (game ? currentMatchup(game) : null), [game]);
+  const quickRecordAvailable = game ? canQuickRecord(game, form.result) : false;
 
   useEffect(() => {
     if (!game) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
-    setSavedGame(game);
+    const next = upsertGame(archiveRef.current, game);
+    try {
+      persistArchive(next);
+      setStorageError('');
+    } catch {
+      setStorageError('保存容量が不足しています。全試合バックアップを出力し、不要な試合を削除してください。');
+    }
+    archiveRef.current = next;
+    setArchive(next);
   }, [game]);
 
   useEffect(() => {
@@ -149,7 +148,11 @@ export default function App() {
       <SavedGameView
         game={resultGame}
         onDownload={() => downloadCsv(resultGame)}
-        onResume={() => { setGame(resultGame); setResultGame(null); }}
+        onResume={() => {
+          setForm({ pitchType: '不明', speed: '', result: '' });
+          setGame(resultGame);
+          setResultGame(null);
+        }}
         onBack={() => { setGame(null); setResultGame(null); }}
       />
     );
@@ -158,20 +161,67 @@ export default function App() {
   if (!game) {
     return (
       <SetupScreen
-        savedGame={savedGame}
-        onStart={(newGame) => { setGame(newGame); setSavedGame(newGame); }}
-        onResume={() => setGame(savedGame)}
-        onViewResult={() => setResultGame(savedGame)}
+        savedGames={archive.games}
+        lineupPresets={archive.lineupPresets}
+        storageError={storageError}
+        onStart={(newGame) => {
+          const next = rememberStartingLineups(upsertGame(archive, newGame), newGame);
+          try {
+            persistArchive(next);
+            setStorageError('');
+          } catch {
+            setStorageError('試合を保存できませんでした。ブラウザの保存容量を確認してください。');
+          }
+          archiveRef.current = next;
+          setArchive(next);
+          setForm({ pitchType: '不明', speed: '', result: '' });
+          setGame(newGame);
+        }}
+        onResume={(savedGame) => {
+          setForm({ pitchType: '不明', speed: '', result: '' });
+          setGame(savedGame);
+        }}
+        onViewResult={setResultGame}
+        onDelete={(gameId) => {
+          const next = removeGame(archive, gameId);
+          try {
+            persistArchive(next);
+            setStorageError('');
+          } catch {
+            setStorageError('保存試合を削除できませんでした。');
+            return;
+          }
+          archiveRef.current = next;
+          setArchive(next);
+        }}
+        onBackup={() => downloadBackup(archive)}
+        onRestore={(text) => {
+          const next = mergeArchive(archive, text);
+          persistArchive(next);
+          archiveRef.current = next;
+          setArchive(next);
+          setStorageError('');
+          return `${next.games.length}試合を保存しています。`;
+        }}
       />
     );
   }
 
-  const openRunnerDialog = () => {
+  const validatePlateAppearanceForm = () => {
+    if (!form.result) {
+      setFormError('打席結果を選択してください。');
+      return false;
+    }
     if (form.speed && (Number(form.speed) < 60 || Number(form.speed) > 180)) {
       setFormError('球速は60〜180km/hで入力するか、不明の場合は空欄にしてください。');
-      return;
+      return false;
     }
     setFormError('');
+    return true;
+  };
+
+  const openRunnerDialog = () => {
+    if (!validatePlateAppearanceForm()) return;
     setRunnerDialogOpen(true);
   };
 
@@ -184,22 +234,29 @@ export default function App() {
       rbi,
     }));
     setRunnerDialogOpen(false);
-    setForm((current) => ({ ...current, speed: '' }));
+    setForm({ pitchType: '不明', speed: '', result: '' });
     setToast('打席を記録しました');
+  };
+
+  const quickRecord = () => {
+    if (!validatePlateAppearanceForm() || !canQuickRecord(game, form.result)) return;
+    const runnerOutcomes = defaultRunnerOutcomes(game, matchup.batter, form.result);
+    commitPlateAppearance({
+      runnerOutcomes,
+      rbi: suggestedRbi(form.result, runnerOutcomes),
+    });
   };
 
   const saveNow = (showResult = false) => {
     const savedAt = new Date().toISOString();
     const next = { ...game, savedAt };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setGame(next);
-    setSavedGame(next);
     if (showResult) setResultGame(next);
-    else setToast('ローカルに保存しました');
+    else setToast('この端末の試合一覧に保存しました');
   };
 
   const newGame = () => {
-    if (!window.confirm('現在の試合を閉じて、新しい試合の設定へ戻りますか？ 保存済みデータはCSV出力しない限り上書きされます。')) return;
+    if (!window.confirm('現在の試合を保存したまま、新しい試合の設定へ戻りますか？')) return;
     setGame(null);
   };
 
@@ -230,13 +287,23 @@ export default function App() {
         </details>
       </header>
 
+      {storageError ? <p className="form-error storage-error" role="alert">{storageError}</p> : null}
+
       <Scoreboard game={game} />
       <MobileGameBar game={game} />
 
       <main className="workspace">
         <LineupRail game={game} side="away" />
         <div className="workspace-center">
-          <MatchupPanel game={game} matchup={matchup} form={form} setForm={setForm} onNext={openRunnerDialog} />
+          <MatchupPanel
+            game={game}
+            matchup={matchup}
+            form={form}
+            setForm={setForm}
+            onNext={openRunnerDialog}
+            onQuickRecord={quickRecord}
+            quickRecordAvailable={quickRecordAvailable}
+          />
           {formError && <p className="form-error form-error--workspace" role="alert">{formError}</p>}
           <GameStatePanel
             game={game}
