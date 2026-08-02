@@ -6,15 +6,23 @@ import MatchupPanel from './components/MatchupPanel';
 import GameStatePanel from './components/GameStatePanel';
 import HistoryTable from './components/HistoryTable';
 import RunnerDialog from './components/RunnerDialog';
+import RunnerActionDialog from './components/RunnerActionDialog';
+import RunnerSubstitutionDialog from './components/RunnerSubstitutionDialog';
+import DefenseChangeDialog from './components/DefenseChangeDialog';
+import GameStatsPanel from './components/GameStatsPanel';
+import SavedGameView from './components/SavedGameView';
 import {
   DEFAULT_LINEUP_POSITIONS,
   STORAGE_KEY,
   applyPlateAppearance,
+  applyRunnerAction,
   currentMatchup,
   exportGameCsv,
   shortTeamName,
   substituteBatter,
+  substituteFielder,
   substitutePitcher,
+  substituteRunner,
   undoLast,
 } from './game';
 
@@ -23,6 +31,7 @@ function readSavedGame() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     const game = JSON.parse(stored);
+    const previousVersion = game.version ?? 1;
     for (const side of ['away', 'home']) {
       const key = `${side}Lineup`;
       game.config[key] = game.config[key].map((player, index) => ({
@@ -30,6 +39,21 @@ function readSavedGame() {
         lineupPosition: player.lineupPosition ?? DEFAULT_LINEUP_POSITIONS[index],
       }));
     }
+    let plateAppearanceNumber = 0;
+    game.events = (game.events ?? []).map((event, index) => {
+      const type = event.type ?? 'plateAppearance';
+      if (type === 'plateAppearance') plateAppearanceNumber += 1;
+      return {
+        ...event,
+        number: index + 1,
+        type,
+        plateAppearanceNumber: type === 'plateAppearance' ? (event.plateAppearanceNumber ?? plateAppearanceNumber) : undefined,
+        rbi: type === 'plateAppearance' ? Number(event.rbi ?? 0) : undefined,
+        scored: event.scored ?? [],
+      };
+    });
+    game.version = 2;
+    if (previousVersion < 2) game.undoStack = [];
     return game;
   } catch {
     return null;
@@ -49,7 +73,7 @@ function downloadCsv(game) {
 }
 
 function MobileSecondary({ game }) {
-  const recent = [...game.events].reverse().slice(0, 5);
+  const recent = [...game.events].reverse().filter((event) => (event.type ?? 'plateAppearance') === 'plateAppearance').slice(0, 5);
   return (
     <details className="mobile-secondary">
       <summary>打順・打席履歴</summary>
@@ -99,6 +123,10 @@ export default function App() {
   const [game, setGame] = useState(null);
   const [form, setForm] = useState({ pitchType: 'ストレート', speed: '', result: '空振り三振' });
   const [runnerDialogOpen, setRunnerDialogOpen] = useState(false);
+  const [runnerActionOpen, setRunnerActionOpen] = useState(false);
+  const [runnerSubstitutionOpen, setRunnerSubstitutionOpen] = useState(false);
+  const [defenseChangeOpen, setDefenseChangeOpen] = useState(false);
+  const [resultGame, setResultGame] = useState(null);
   const [formError, setFormError] = useState('');
   const [toast, setToast] = useState('');
 
@@ -116,12 +144,24 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  if (resultGame) {
+    return (
+      <SavedGameView
+        game={resultGame}
+        onDownload={() => downloadCsv(resultGame)}
+        onResume={() => { setGame(resultGame); setResultGame(null); }}
+        onBack={() => { setGame(null); setResultGame(null); }}
+      />
+    );
+  }
+
   if (!game) {
     return (
       <SetupScreen
         savedGame={savedGame}
         onStart={(newGame) => { setGame(newGame); setSavedGame(newGame); }}
         onResume={() => setGame(savedGame)}
+        onViewResult={() => setResultGame(savedGame)}
       />
     );
   }
@@ -135,24 +175,27 @@ export default function App() {
     setRunnerDialogOpen(true);
   };
 
-  const commitPlateAppearance = (runnerOutcomes) => {
+  const commitPlateAppearance = ({ runnerOutcomes, rbi }) => {
     setGame((current) => applyPlateAppearance(current, {
       ...form,
       batter: matchup.batter,
       pitcher: matchup.pitcher,
       runnerOutcomes,
+      rbi,
     }));
     setRunnerDialogOpen(false);
     setForm((current) => ({ ...current, speed: '' }));
     setToast('打席を記録しました');
   };
 
-  const saveNow = () => {
+  const saveNow = (showResult = false) => {
     const savedAt = new Date().toISOString();
     const next = { ...game, savedAt };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setGame(next);
-    setToast('ローカルに保存しました');
+    setSavedGame(next);
+    if (showResult) setResultGame(next);
+    else setToast('ローカルに保存しました');
   };
 
   const newGame = () => {
@@ -168,7 +211,8 @@ export default function App() {
           <span>{game.config.date}　{shortTeamName(game.config.awayTeam)} vs {shortTeamName(game.config.homeTeam)}</span>
         </div>
         <div className="header-actions">
-          <button type="button" className="button button--outline" onClick={saveNow}>試合を保存</button>
+          <button type="button" className="button button--outline" onClick={() => saveNow(false)}>試合を保存</button>
+          <button type="button" className="button button--primary" onClick={() => saveNow(true)}>保存結果を見る</button>
           <button type="button" className="button button--success" onClick={() => downloadCsv(game)}>CSV出力</button>
           <button type="button" className="button button--danger" disabled={!game.undoStack.length} onClick={() => {
             setGame((current) => undoLast(current));
@@ -179,6 +223,7 @@ export default function App() {
         <details className="mobile-menu">
           <summary aria-label="メニュー">⋮</summary>
           <div>
+            <button type="button" onClick={() => saveNow(true)}>保存結果を見る</button>
             <button type="button" onClick={() => downloadCsv(game)}>CSV出力</button>
             <button type="button" onClick={newGame}>新しい試合</button>
           </div>
@@ -189,31 +234,36 @@ export default function App() {
       <MobileGameBar game={game} />
 
       <main className="workspace">
-        <LineupRail game={game} />
+        <LineupRail game={game} side="away" />
         <div className="workspace-center">
           <MatchupPanel game={game} matchup={matchup} form={form} setForm={setForm} onNext={openRunnerDialog} />
           {formError && <p className="form-error form-error--workspace" role="alert">{formError}</p>}
+          <GameStatePanel
+            game={game}
+            matchup={matchup}
+            onPitcherChange={(pitcher) => {
+              setGame((current) => substitutePitcher(current, matchup.defenseSide, pitcher));
+              setToast(`${pitcher.name}に投手交代しました`);
+            }}
+            onBatterChange={(batter) => {
+              setGame((current) => substituteBatter(current, matchup.offenseSide, current.battingIndexes[matchup.offenseSide], batter));
+              setToast(`${batter.name}を現在の打順に登録しました`);
+            }}
+            onRunnerAction={() => setRunnerActionOpen(true)}
+            onRunnerSubstitution={() => setRunnerSubstitutionOpen(true)}
+            onDefenseChange={() => setDefenseChangeOpen(true)}
+          />
         </div>
-        <GameStatePanel
-          game={game}
-          matchup={matchup}
-          onPitcherChange={(pitcher) => {
-            setGame((current) => substitutePitcher(current, matchup.defenseSide, pitcher));
-            setToast(`${pitcher.name}に投手交代しました`);
-          }}
-          onBatterChange={(batter) => {
-            setGame((current) => substituteBatter(current, matchup.offenseSide, current.battingIndexes[matchup.offenseSide], batter));
-            setToast(`${batter.name}を現在の打順に登録しました`);
-          }}
-        />
+        <LineupRail game={game} side="home" />
       </main>
 
+      <GameStatsPanel game={game} />
       <HistoryTable events={game.events} />
       <MobileSecondary game={game} />
 
       <div className="mobile-sticky-actions">
         <button type="button" onClick={() => setGame((current) => undoLast(current))} disabled={!game.undoStack.length}>入力を取り消す</button>
-        <button type="button" onClick={saveNow}>一時保存</button>
+        <button type="button" onClick={() => saveNow(false)}>一時保存</button>
       </div>
 
       {runnerDialogOpen && (
@@ -223,6 +273,39 @@ export default function App() {
           result={form.result}
           onCancel={() => setRunnerDialogOpen(false)}
           onConfirm={commitPlateAppearance}
+        />
+      )}
+      {runnerActionOpen && (
+        <RunnerActionDialog
+          game={game}
+          onCancel={() => setRunnerActionOpen(false)}
+          onConfirm={(payload) => {
+            setGame((current) => applyRunnerAction(current, payload));
+            setRunnerActionOpen(false);
+            setToast(`${payload.action}を記録しました`);
+          }}
+        />
+      )}
+      {runnerSubstitutionOpen && (
+        <RunnerSubstitutionDialog
+          game={game}
+          onCancel={() => setRunnerSubstitutionOpen(false)}
+          onConfirm={(base, runner) => {
+            setGame((current) => substituteRunner(current, base, runner));
+            setRunnerSubstitutionOpen(false);
+            setToast(`${runner.name}を代走に登録しました`);
+          }}
+        />
+      )}
+      {defenseChangeOpen && (
+        <DefenseChangeDialog
+          game={game}
+          onCancel={() => setDefenseChangeOpen(false)}
+          onConfirm={(side, lineupIndex, player, position) => {
+            setGame((current) => substituteFielder(current, side, lineupIndex, player, position));
+            setDefenseChangeOpen(false);
+            setToast(`${player.name}を${position}で登録しました`);
+          }}
         />
       )}
       {toast && <div className="toast" role="status">{toast}</div>}

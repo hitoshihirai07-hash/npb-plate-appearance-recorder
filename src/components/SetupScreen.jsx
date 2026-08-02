@@ -76,7 +76,7 @@ function LineupEditor({ team, lineup, onChange }) {
   );
 }
 
-export default function SetupScreen({ savedGame, onStart, onResume }) {
+export default function SetupScreen({ savedGame, onStart, onResume, onViewResult }) {
   const opponents = dataStore.teams.filter((team) => team !== GIANTS);
   const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [giantsSide, setGiantsSide] = useState('home');
@@ -160,9 +160,12 @@ export default function SetupScreen({ savedGame, onStart, onResume }) {
           <p>守備位置と選手を検索して、両チームの打順を設定します。</p>
         </div>
         {savedGame && (
-          <button type="button" className="button button--outline" onClick={onResume}>
-            保存中の試合を再開
-          </button>
+          <div className="setup-saved-actions">
+            <button type="button" className="button button--outline" onClick={onViewResult}>保存結果を見る</button>
+            {!savedGame.finished ? (
+              <button type="button" className="button button--primary" onClick={onResume}>保存中の試合を再開</button>
+            ) : null}
+          </div>
         )}
       </header>
 

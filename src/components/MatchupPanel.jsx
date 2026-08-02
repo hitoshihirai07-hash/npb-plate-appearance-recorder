@@ -1,5 +1,5 @@
 import { getBatterStats, getMatchupStats, getPitcherStats } from '../data';
-import { PITCH_TYPES, RESULTS } from '../game';
+import { getPlayerGameStats, PITCH_TYPES, RESULTS } from '../game';
 
 function Stat({ label, value }) {
   return <div className="stat"><span>{label}</span><strong>{value}</strong></div>;
@@ -9,6 +9,8 @@ export default function MatchupPanel({ game, matchup, form, setForm, onNext }) {
   const pitcherStats = getPitcherStats(matchup.pitcher.id);
   const batterStats = getBatterStats(matchup.batter.id);
   const headToHead = getMatchupStats(matchup.pitcher.id, matchup.batter.id);
+  const today = getPlayerGameStats(game, matchup.offenseSide, matchup.batter.id);
+  const todayText = `${today?.ab ?? 0}打数${today?.hits ?? 0}安打・${today?.homeRuns ?? 0}本塁打・${today?.rbi ?? 0}打点`;
 
   return (
     <section className="matchup-panel" aria-labelledby="matchup-title">
@@ -31,6 +33,7 @@ export default function MatchupPanel({ game, matchup, form, setForm, onNext }) {
             <Stat label="本塁打" value={batterStats.hr} />
             <Stat label="OPS" value={batterStats.ops} />
           </div>
+          <div className="today-batting-line"><span>今日の成績</span><strong>{todayText}</strong></div>
         </div>
       </div>
 
@@ -49,7 +52,11 @@ export default function MatchupPanel({ game, matchup, form, setForm, onNext }) {
         <div className="pitch-fields">
           <label>
             <span>球種</span>
-            <select value={form.pitchType} onChange={(event) => setForm({ ...form, pitchType: event.target.value })}>
+            <select
+              value={form.pitchType}
+              disabled={form.result === '申告敬遠'}
+              onChange={(event) => setForm((current) => ({ ...current, pitchType: event.target.value }))}
+            >
               {PITCH_TYPES.map((type) => <option key={type}>{type}</option>)}
             </select>
           </label>
@@ -62,12 +69,21 @@ export default function MatchupPanel({ game, matchup, form, setForm, onNext }) {
               max="180"
               placeholder="不明は空欄"
               value={form.speed}
-              onChange={(event) => setForm({ ...form, speed: event.target.value })}
+              disabled={form.result === '申告敬遠'}
+              onChange={(event) => setForm((current) => ({ ...current, speed: event.target.value }))}
             />
           </label>
           <label>
             <span>打席結果</span>
-            <select value={form.result} onChange={(event) => setForm({ ...form, result: event.target.value })}>
+            <select value={form.result} onChange={(event) => setForm((current) => {
+              const result = event.target.value;
+              return {
+                ...current,
+                result,
+                pitchType: result === '申告敬遠' ? '投球なし' : (current.pitchType === '投球なし' ? 'ストレート' : current.pitchType),
+                speed: result === '申告敬遠' ? '' : current.speed,
+              };
+            })}>
               {RESULTS.map((result) => <option key={result}>{result}</option>)}
             </select>
           </label>

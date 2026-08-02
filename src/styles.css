@@ -513,8 +513,8 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(250px, 0.8fr) minmax(580px, 2.15fr) minmax(285px, 0.95fr);
-  grid-template-areas: "lineup center state";
+  grid-template-columns: minmax(220px, 0.72fr) minmax(640px, 2.3fr) minmax(220px, 0.72fr);
+  grid-template-areas: "away center home";
   gap: 10px;
   margin-top: 10px;
 }
@@ -522,25 +522,21 @@ button:disabled {
 .lineup-rail,
 .matchup-panel,
 .game-state-panel,
+.game-stats-panel,
 .history-panel {
   border: 1px solid var(--line);
   background: var(--surface);
 }
 
-.lineup-rail {
-  grid-area: lineup;
-}
+.lineup-rail--away { grid-area: away; }
+.lineup-rail--home { grid-area: home; }
 
 .workspace-center {
   grid-area: center;
-}
-
-.game-state-panel {
-  grid-area: state;
-}
-
-.lineup-block + .lineup-block {
-  border-top: 5px solid #eef2f6;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .lineup-block h2 {
@@ -608,7 +604,6 @@ button:disabled {
 }
 
 .matchup-panel {
-  min-height: 100%;
   box-shadow: var(--shadow);
 }
 
@@ -635,6 +630,27 @@ button:disabled {
   color: #07182f;
   font-size: clamp(21px, 2vw, 29px);
   letter-spacing: 0.03em;
+}
+
+.today-batting-line {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 7px;
+  border-radius: 3px;
+  background: #fff4dc;
+  color: #8a3900;
+  font-size: 11px;
+}
+
+.today-batting-line span {
+  font-weight: 700;
+}
+
+.today-batting-line strong {
+  font-size: 12px;
 }
 
 .versus {
@@ -764,9 +780,33 @@ button:disabled {
 }
 
 .game-state-panel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(330px, 1.1fr);
+  gap: 18px;
   padding: 15px 12px 12px;
+}
+
+.game-state-visual {
+  display: grid;
+  grid-template-columns: 1fr 170px;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-state-visual .diamond {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.game-state-visual .runner-summary {
+  grid-column: 1;
+}
+
+.game-state-controls {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .game-state-heading {
@@ -895,8 +935,91 @@ button:disabled {
   min-width: 210px;
 }
 
+.game-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.game-action-buttons button {
+  min-height: 42px;
+  border: 1px solid #8ba7c9;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #174d8b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.game-action-buttons button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.game-stats-panel,
 .history-panel {
   margin-top: 10px;
+}
+
+.game-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px;
+}
+
+.team-batting-stats {
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+}
+
+.team-batting-stats h3 {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  font-size: 14px;
+}
+
+.batting-stats-scroll {
+  overflow-x: auto;
+}
+
+.team-batting-stats table {
+  width: 100%;
+  min-width: 610px;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.team-batting-stats th,
+.team-batting-stats td {
+  padding: 5px 6px;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  text-align: center;
+}
+
+.team-batting-stats th {
+  background: #f7f9fc;
+  color: var(--muted);
+}
+
+.team-batting-stats td:nth-child(2) {
+  min-width: 104px;
+  text-align: left;
+}
+
+.team-batting-stats td span {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.team-batting-stats tr.is-replaced {
+  background: #f5f6f8;
+  color: #6c7480;
 }
 
 .history-heading {
@@ -958,6 +1081,14 @@ button:disabled {
   display: block;
   color: var(--muted);
   font-size: 10px;
+}
+
+.history-event--runnerAction {
+  background: #fff8e8;
+}
+
+.history-event--substitution {
+  background: #eef6ff;
 }
 
 .result-cell {
@@ -1099,6 +1230,84 @@ button:disabled {
   font-size: 18px;
 }
 
+.rbi-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.rbi-field input {
+  width: 64px;
+  height: 36px;
+  border: 1px solid #aab6c5;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.dialog-select-field {
+  display: grid;
+  grid-template-columns: 170px minmax(220px, 360px);
+  align-items: center;
+  gap: 14px;
+  margin: 16px 22px 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dialog-select-field select,
+.substitution-dialog__fields select {
+  width: 100%;
+  height: 46px;
+  border: 1px solid #aab6c5;
+  border-radius: 4px;
+  background: white;
+  padding: 0 10px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.substitution-dialog {
+  width: min(760px, 100%);
+}
+
+.substitution-dialog__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 20px 22px 8px;
+}
+
+.substitution-dialog__fields--three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.substitution-dialog__fields label {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.substitution-dialog__player {
+  grid-column: 1 / -1;
+}
+
+.substitution-dialog__fields .player-search > input {
+  width: 100%;
+  height: 46px;
+  border: 1px solid #aab6c5;
+  border-radius: 4px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -1125,6 +1334,47 @@ button:disabled {
   animation: toast-in 180ms ease-out;
 }
 
+.saved-game-view {
+  min-height: 100vh;
+  padding: 10px 14px 30px;
+  background: var(--page);
+}
+
+.saved-game-summary {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  margin: 10px 0;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.saved-game-summary span,
+.saved-game-summary small {
+  color: var(--muted);
+}
+
+.saved-game-summary strong {
+  color: var(--navy-900);
+  font-size: 28px;
+}
+
+.saved-game-bottom-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+.setup-saved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1132,30 +1382,14 @@ button:disabled {
 
 @media (max-width: 1100px) {
   .workspace {
-    grid-template-columns: 230px minmax(510px, 1fr);
+    grid-template-columns: 1fr 1fr;
     grid-template-areas:
-      "lineup center"
-      "lineup state";
+      "center center"
+      "away home";
   }
 
   .game-state-panel {
-    display: grid;
-    grid-template-columns: 0.8fr 170px 1fr;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .game-state-panel .runner-summary {
-    display: none;
-  }
-
-  .substitution-control {
-    grid-column: 3;
-  }
-
-  .diamond {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -1403,6 +1637,16 @@ button:disabled {
     padding: 12px;
   }
 
+  .game-state-visual {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .game-state-controls {
+    width: 100%;
+  }
+
   .game-state-heading {
     display: none;
   }
@@ -1414,6 +1658,12 @@ button:disabled {
     width: 170px;
     height: 142px;
     margin-top: 2px;
+  }
+
+  .game-state-visual .diamond,
+  .game-state-visual .runner-summary {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .base--second { left: 72px; }
@@ -1436,8 +1686,35 @@ button:disabled {
     width: 100%;
   }
 
+  .game-action-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .game-action-buttons button {
+    min-height: 46px;
+  }
+
+  .game-stats-grid {
+    grid-template-columns: 1fr;
+    padding: 8px;
+  }
+
+  .game-stats-panel {
+    margin: 10px;
+    border-radius: var(--radius);
+  }
+
   .history-panel {
     display: none;
+  }
+
+  .saved-game-view .history-panel {
+    display: block;
+    margin: 10px 0;
+  }
+
+  .saved-game-view .history-scroll {
+    max-height: 320px;
   }
 
   .mobile-secondary {
@@ -1602,7 +1879,24 @@ button:disabled {
     margin-inline: 14px;
   }
 
+  .dialog-select-field {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    margin: 14px;
+  }
+
+  .substitution-dialog__fields,
+  .substitution-dialog__fields--three {
+    grid-template-columns: 1fr;
+    padding: 16px 14px 6px;
+  }
+
+  .substitution-dialog__player {
+    grid-column: auto;
+  }
+
   .dialog-summary {
+    flex-wrap: wrap;
     margin-inline: 14px;
   }
 

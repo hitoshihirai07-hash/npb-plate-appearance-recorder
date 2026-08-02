@@ -11,9 +11,15 @@ const DESTINATIONS = [
 
 const SOURCE_LABEL = { batter: '打者', first: '一塁走者', second: '二塁走者', third: '三塁走者' };
 
+function suggestedRbi(result, outcomes) {
+  if (result === '失策' || result === '併殺打') return 0;
+  return outcomes.filter((item) => item.destination === 'score').length;
+}
+
 export default function RunnerDialog({ game, batter, result, onCancel, onConfirm }) {
   const initial = useMemo(() => defaultRunnerOutcomes(game, batter, result), [game, batter, result]);
   const [outcomes, setOutcomes] = useState(initial);
+  const [rbi, setRbi] = useState(() => suggestedRbi(result, initial));
   const [error, setError] = useState('');
 
   const confirm = () => {
@@ -28,7 +34,12 @@ export default function RunnerDialog({ game, batter, result, onCancel, onConfirm
       setError('打者の結果を設定してください。');
       return;
     }
-    onConfirm(outcomes);
+    const scored = outcomes.filter((item) => item.destination === 'score').length;
+    if (Number(rbi) < 0 || Number(rbi) > scored) {
+      setError('打点は0から、このプレーで入った得点数までで入力してください。');
+      return;
+    }
+    onConfirm({ runnerOutcomes: outcomes, rbi: Number(rbi) });
   };
 
   return (
@@ -58,9 +69,13 @@ export default function RunnerDialog({ game, batter, result, onCancel, onConfirm
                       name={`destination-${outcome.source}`}
                       value={value}
                       checked={outcome.destination === value}
-                      onChange={() => setOutcomes(outcomes.map((item, itemIndex) => (
-                        itemIndex === index ? { ...item, destination: value } : item
-                      )))}
+                      onChange={() => {
+                        const next = outcomes.map((item, itemIndex) => (
+                          itemIndex === index ? { ...item, destination: value } : item
+                        ));
+                        setOutcomes(next);
+                        setRbi(suggestedRbi(result, next));
+                      }}
                     />
                     {label}
                   </label>
@@ -73,6 +88,16 @@ export default function RunnerDialog({ game, batter, result, onCancel, onConfirm
         <div className="dialog-summary">
           <span>得点　<strong>{outcomes.filter((item) => item.destination === 'score').length}</strong></span>
           <span>アウト追加　<strong>{outcomes.filter((item) => item.destination === 'out').length}</strong></span>
+          <label className="rbi-field">
+            打点
+            <input
+              type="number"
+              min="0"
+              max={outcomes.filter((item) => item.destination === 'score').length}
+              value={rbi}
+              onChange={(event) => setRbi(event.target.value)}
+            />
+          </label>
         </div>
         <div className="dialog-actions">
           <button type="button" className="button button--outline" onClick={onCancel}>戻る</button>

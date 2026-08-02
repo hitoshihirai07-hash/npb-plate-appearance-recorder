@@ -1,6 +1,7 @@
 import playerMasterCsv from '../選手管理.csv?raw';
 import pitcherStatsCsv from '../選手別成績.csv?raw';
 import matchupStatsCsv from '../選手同士成績.csv?raw';
+import batterStatsCsv from '../batter_stas.csv?raw';
 
 export function parseCsv(text) {
   const rows = [];
@@ -56,48 +57,27 @@ const pitcherStats = new Map(
 const matchupRows = parseCsv(matchupStatsCsv);
 const matchupStats = new Map(matchupRows.map((row) => [`${row.投手ID}|${row.野手ID}`, row]));
 
-const batterTotals = new Map();
-for (const row of matchupRows) {
-  const current = batterTotals.get(row.野手ID) ?? {
-    pa: 0,
-    ab: 0,
-    h: 0,
-    singles: 0,
-    doubles: 0,
-    triples: 0,
-    hr: 0,
-    bb: 0,
-    hbp: 0,
-    sf: 0,
-  };
-  current.pa += Number(row.打席 || 0);
-  current.ab += Number(row.打数 || 0);
-  current.h += Number(row.安打 || 0);
-  current.singles += Number(row.単打 || 0);
-  current.doubles += Number(row.二塁打 || 0);
-  current.triples += Number(row.三塁打 || 0);
-  current.hr += Number(row.本塁打 || 0);
-  current.bb += Number(row.四球 || 0);
-  current.hbp += Number(row.死球 || 0);
-  current.sf += Number(row.犠飛 || 0);
-  batterTotals.set(row.野手ID, current);
-}
+const batterStats = new Map(parseCsv(batterStatsCsv).map((row) => [row.選手ID, row]));
 
-function fixed(value, digits = 3) {
-  if (!Number.isFinite(value)) return '---';
-  return value.toFixed(digits).replace(/^0/, '');
+function displayRate(value) {
+  return value ? value.replace(/^0(?=\.)/, '') : '---';
 }
 
 export function getBatterStats(id) {
-  const total = batterTotals.get(id);
-  if (!total) return { avg: '---', hr: '0', ops: '---', pa: 0 };
-  const avg = total.ab ? total.h / total.ab : 0;
-  const obpDenominator = total.ab + total.bb + total.hbp + total.sf;
-  const obp = obpDenominator ? (total.h + total.bb + total.hbp) / obpDenominator : 0;
-  const slg = total.ab
-    ? (total.singles + total.doubles * 2 + total.triples * 3 + total.hr * 4) / total.ab
-    : 0;
-  return { avg: fixed(avg), hr: String(total.hr), ops: fixed(obp + slg), pa: total.pa };
+  const row = batterStats.get(id);
+  if (!row) return { avg: '---', hr: '0', ops: '---', pa: 0, ab: 0, hits: 0, rbi: 0 };
+  return {
+    pa: Number(row.打席 || 0),
+    ab: Number(row.打数 || 0),
+    hits: Number(row.安打 || 0),
+    hr: row.本塁打 || '0',
+    rbi: Number(row.打点 || 0),
+    avg: displayRate(row.打率),
+    obp: displayRate(row.出塁率),
+    slg: displayRate(row.長打率),
+    ops: displayRate(row.OPS),
+    updatedAt: row.更新日,
+  };
 }
 
 export function getPitcherStats(id) {
